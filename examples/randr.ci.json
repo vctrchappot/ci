@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "ignore": ["docs/**", "**/*.md", "!CHANGELOG.md"],
+  "critical": [
+    ".github/**",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "functions/package.json",
+    "functions/package-lock.json",
+    "firestore.rules",
+    "storage.rules",
+    "firebase*.json",
+    "functions/gateway/**"
+  ],
+  "verifyOnly": ["tests/*.test.mjs", "tests/fixtures/**"],
+  "suites": {
+    "verify": ["**"],
+    "ui": [
+      "app/**",
+      "components/**",
+      "design-system/**",
+      "public/**",
+      "hooks/**",
+      "state/**",
+      "lib/**",
+      "instrumentation*",
+      "next.config.ts",
+      "next-env.d.ts",
+      "eslint.config.mjs",
+      "tsconfig.json",
+      "vitest.config.mts",
+      "CHANGELOG.md",
+      "tests/*.test.tsx",
+      "tests/fixtures/ui/**",
+      "scripts/*screen*",
+      "scripts/*landing*",
+      "scripts/preview-ui.mjs"
+    ],
+    "backend": [
+      "functions/**",
+      "cli/**",
+      "tests/support/**",
+      "tests/firebase*.mjs",
+      "tests/gateway*.mjs",
+      "tests/cli*.mjs",
+      "tests/connectors*.mjs",
+      "tests/github*.mjs",
+      "scripts/deploy-asset-gateway.mjs",
+      "scripts/build-cli.mjs"
+    ]
+  }
+}

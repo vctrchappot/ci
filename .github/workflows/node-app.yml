@@ -1,0 +1,150 @@
+name: Node app checks
+
+# Reusable workflow: scope -> verify / ui / backend -> check. A job runs only when the repository's .github/ci.json says
+# the change set needs it AND the caller gave it a command. The job named `check` is the one result to require.
+#
+# Caller (see templates/ci.yml.tpl):
+#   jobs:
+#     ci:
+#       uses: vctrchappot/ci/.github/workflows/node-app.yml@v1
+#       with: { verify: "pnpm lint && pnpm test" }
+on:
+  workflow_call:
+    inputs:
+      verify:
+        description: Shell commands for the cheap suite (format, lint, types, unit tests).
+        type: string
+        required: true
+      ui:
+        description: Shell commands for the UI suite (build, browser checks). Empty skips the suite.
+        type: string
+        default: ""
+      backend:
+        description: Shell commands for the backend suite (emulators, integration). Empty skips the suite.
+        type: string
+        default: ""
+      java:
+        description: Java major version for the backend suite, for example 21. Empty installs none.
+        type: string
+        default: ""
+      node-version:
+        type: string
+        default: "22"
+      default-branch:
+        type: string
+        default: master
+      runner:
+        description: Runner label for every job. One switch if the jobs ever move to self-hosted runners.
+        type: string
+        default: ubuntu-24.04
+      ui-cache-dir:
+        description: Directory to cache between UI runs (for example .next/cache). Empty disables the cache.
+        type: string
+        default: ""
+      ui-cache-sources:
+        description: Space separated git pathspecs whose content keys the UI cache (for example "app components lib").
+        type: string
+        default: ""
+      backend-cache-dir:
+        description: Directory to cache for the backend suite (for example ~/.cache/firebase/emulators).
+        type: string
+        default: ""
+
+jobs:
+  scope:
+    if: github.event.pull_request.draft != true
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 5
+    outputs:
+      verify: ${{ steps.scope.outputs.verify }}
+      ui: ${{ steps.scope.outputs.ui }}
+      backend: ${{ steps.scope.outputs.backend }}
+      tree: ${{ steps.scope.outputs.tree }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - id: scope
+        uses: vctrchappot/ci/actions/scope@v1
+        with:
+          default-branch: ${{ inputs.default-branch }}
+          ci-full: ${{ vars.CI_FULL }}
+          skip-verified: ${{ vars.CI_SKIP_VERIFIED }}
+
+  verify:
+    needs: scope
+    if: needs.scope.outputs.verify == 'true' && inputs.verify != ''
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: vctrchappot/ci/actions/setup@v1
+        with:
+          node-version: ${{ inputs.node-version }}
+      - env:
+          COMMANDS: ${{ inputs.verify }}
+        run: bash -eo pipefail -c "$COMMANDS"
+
+  ui:
+    needs: scope
+    if: needs.scope.outputs.ui == 'true' && inputs.ui != ''
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # Keyed on the content of the source files, taken before the install so node_modules is not part of it.
+      - id: key
+        if: inputs.ui-cache-dir != ''
+        env:
+          SOURCES: ${{ inputs.ui-cache-sources }}
+        run: echo "hash=$(git ls-files -s -- $SOURCES | sha256sum | cut -c1-32)" >> "$GITHUB_OUTPUT"
+      - if: inputs.ui-cache-dir != ''
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ inputs.ui-cache-dir }}
+          key: ui-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json', '**/yarn.lock') }}-${{ steps.key.outputs.hash }}
+          restore-keys: |
+            ui-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json', '**/yarn.lock') }}-
+      - uses: vctrchappot/ci/actions/setup@v1
+        with:
+          node-version: ${{ inputs.node-version }}
+      - env:
+          COMMANDS: ${{ inputs.ui }}
+        run: bash -eo pipefail -c "$COMMANDS"
+
+  backend:
+    needs: scope
+    if: needs.scope.outputs.backend == 'true' && inputs.backend != ''
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - if: inputs.java != ''
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java }}
+      - if: inputs.backend-cache-dir != ''
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ inputs.backend-cache-dir }}
+          key: backend-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', '**/package-lock.json', '**/yarn.lock') }}
+          restore-keys: |
+            backend-${{ runner.os }}-
+      - uses: vctrchappot/ci/actions/setup@v1
+        with:
+          node-version: ${{ inputs.node-version }}
+      - env:
+          COMMANDS: ${{ inputs.backend }}
+        run: bash -eo pipefail -c "$COMMANDS"
+
+  check:
+    needs: [scope, verify, ui, backend]
+    if: always() && github.event.pull_request.draft != true
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 2
+    steps:
+      - uses: vctrchappot/ci/actions/gate@v1
+        with:
+          results: ${{ toJSON(needs) }}
+          tree: ${{ needs.scope.outputs.tree }}

@@ -1,0 +1,52 @@
+name: CI scope
+description: Which suites does this change set need, and can a push to the default branch skip them? Needs a full checkout (fetch-depth 0) and reads the caller's .github/ci.json.
+
+inputs:
+  policy:
+    description: Path of the policy file in the calling repository.
+    default: .github/ci.json
+  default-branch:
+    description: Branch whose pushes may skip suites that already passed on their pull request.
+    default: master
+  ci-full:
+    description: "1 forces every suite (repository variable CI_FULL)."
+    default: ""
+  skip-verified:
+    description: "1 lets a push to the default branch skip suites whose tree passed on its pull request. Anything else only logs what it would skip."
+    default: ""
+  token:
+    description: Token for the pull request and status lookups.
+    default: ${{ github.token }}
+
+outputs:
+  verify:
+    description: Run the cheap suite.
+    value: ${{ steps.scope.outputs.verify }}
+  ui:
+    description: Run the UI suite.
+    value: ${{ steps.scope.outputs.ui }}
+  backend:
+    description: Run the backend suite.
+    value: ${{ steps.scope.outputs.backend }}
+  tree:
+    description: Git tree of the tested commit, recorded by the gate.
+    value: ${{ steps.scope.outputs.tree }}
+  reason:
+    description: Why these suites were chosen.
+    value: ${{ steps.scope.outputs.reason }}
+
+runs:
+  using: composite
+  steps:
+    - id: scope
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/scope.mjs"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        POLICY: ${{ inputs.policy }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        CI_FULL: ${{ inputs.ci-full }}
+        CI_SKIP_VERIFIED: ${{ inputs.skip-verified }}
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
+        PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        PUSH_BEFORE: ${{ github.event.before }}
