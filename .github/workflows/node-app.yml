@@ -85,9 +85,10 @@ jobs:
       - uses: vctrchappot/ci/actions/setup@v1
         with:
           node-version: ${{ inputs.node-version }}
-      - env:
-          COMMANDS: ${{ inputs.verify }}
-        run: bash -eo pipefail -c "$COMMANDS"
+      - uses: vctrchappot/ci/actions/run@v1
+        with:
+          suite: verify
+          commands: ${{ inputs.verify }}
 
   ui:
     needs: scope
@@ -112,9 +113,10 @@ jobs:
       - uses: vctrchappot/ci/actions/setup@v1
         with:
           node-version: ${{ inputs.node-version }}
-      - env:
-          COMMANDS: ${{ inputs.ui }}
-        run: bash -eo pipefail -c "$COMMANDS"
+      - uses: vctrchappot/ci/actions/run@v1
+        with:
+          suite: ui
+          commands: ${{ inputs.ui }}
       - if: failure() && inputs.ui-artifact-path != ''
         uses: actions/upload-artifact@v4
         with:
@@ -144,9 +146,10 @@ jobs:
       - uses: vctrchappot/ci/actions/setup@v1
         with:
           node-version: ${{ inputs.node-version }}
-      - env:
-          COMMANDS: ${{ inputs.backend }}
-        run: bash -eo pipefail -c "$COMMANDS"
+      - uses: vctrchappot/ci/actions/run@v1
+        with:
+          suite: backend
+          commands: ${{ inputs.backend }}
 
   check:
     needs: [scope, verify, ui, backend]

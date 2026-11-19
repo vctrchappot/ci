@@ -8,6 +8,7 @@ This repository is public and holds no secrets, so private repositories of the s
 
 - **Scope:** `.github/ci.json` in the calling repo maps path groups to suites (`verify`, `ui`, `backend`). Critical paths
   (workflows, lockfiles, rules, auth) and files nobody classified run everything. Any error in the scope step runs everything.
+- **Every command is timed.** A suite's commands run one per line; the log marks each with its duration and the job summary lists them in a table, so you can see what a suite spends its minutes on. Commands that depend on each other (`export`, `cd`, loops, a line that continues on the next) run as one block as before, and then only the total is timed.
 - **One install per job, one build per run.** Suites replace many small jobs that each installed and built.
 - **Skip what already passed:** a pull request records the tree it tested (commit status `ci/verified-tree`). The push to the
   default branch after the merge skips its suites only if that exact tree passed, the previous commit's gate was green and no
@@ -38,6 +39,7 @@ agents in `AGENTS.md` (and `CLAUDE.md` when it exists). It never deletes existin
 | `actions/scope` | decides the suites (`scope.mjs`, no dependencies) |
 | `actions/setup` | Node, package manager cache, locked install (pnpm, yarn or npm) |
 | `actions/gate` | fails on failed or cancelled suites, records the verified tree |
+| `actions/run` | runs a suite's commands one per line, times each, writes the job summary (`run.mjs`, no dependencies) |
 | `examples/randr.ci.json` | a real policy, also the fixture of the tests |
 | `scripts/onboard.sh` | connect a repository |
 | `scripts/usage.mjs` | Actions minutes per private repository and which ones are not connected |
