@@ -41,6 +41,10 @@ on:
         description: Directory to cache between UI runs (for example .next/cache). Empty disables the cache.
         type: string
         default: ""
+      ui-artifact-path:
+        description: Path uploaded as an artifact when the UI suite fails (for example playwright-report). Empty uploads nothing.
+        type: string
+        default: ""
       ui-cache-sources:
         description: Space separated git pathspecs whose content keys the UI cache (for example "app components lib").
         type: string
@@ -111,6 +115,12 @@ jobs:
       - env:
           COMMANDS: ${{ inputs.ui }}
         run: bash -eo pipefail -c "$COMMANDS"
+      - if: failure() && inputs.ui-artifact-path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-failure-report
+          path: ${{ inputs.ui-artifact-path }}
+          retention-days: 7
 
   backend:
     needs: scope
