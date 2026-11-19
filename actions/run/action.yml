@@ -1,0 +1,19 @@
+name: CI run
+description: Runs a suite's shell commands one per line, times each and writes a table to the job summary. Commands that depend on each other (variables, cd, loops) run as one block, as before.
+
+inputs:
+  commands:
+    description: The suite's commands, one per line.
+    required: true
+  suite:
+    description: Name shown in the summary, for example verify.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        COMMANDS: ${{ inputs.commands }}
+        SUITE: ${{ inputs.suite }}
+      run: node "$GITHUB_ACTION_PATH/run.mjs"
