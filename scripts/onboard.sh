@@ -64,6 +64,38 @@ write_files() {
   fi
   has_script build && ui="      ui: |"$'\n'"        ${run} build"$'\n'
 
+  # What the existing workflows do that the new caller would silently drop: the Node version, and package.json scripts
+  # they run that are not among the commands above (end-to-end tests, export builds, ...).
+  local covered="build" detected nodever uncovered todo="" nodeline=""
+  for s in format:check lint typecheck test; do has_script "$s" && covered="$covered $s"; done
+  detected="$(node - "$root" $covered <<'JS'
+const fs = require("fs"), path = require("path");
+const [root, ...covered] = process.argv.slice(2);
+const scripts = Object.keys(require(path.join(root, "package.json")).scripts || {});
+const dir = path.join(root, ".github/workflows");
+let text = "";
+if (fs.existsSync(dir)) {
+  for (const file of fs.readdirSync(dir)) {
+    if (!/\.ya?ml$/.test(file)) continue;
+    const body = fs.readFileSync(path.join(dir, file), "utf8");
+    // Our own caller (from an earlier run) is not "an old workflow".
+    if (!body.includes("vctrchappot/ci/.github/workflows/")) text += body + "\n";
+  }
+}
+const used = new Set();
+for (const m of text.matchAll(/\b(?:npm run|npm|pnpm run|pnpm|yarn run|yarn)\s+([\w:.-]+)/g)) used.add(m[1]);
+console.log((text.match(/node-version:\s*["']?(\d+)/) || [])[1] || "");
+console.log([...used].filter((name) => scripts.includes(name) && !covered.includes(name)).join(" "));
+JS
+)"
+  nodever="$(printf '%s\n' "$detected" | sed -n 1p)"
+  uncovered="$(printf '%s\n' "$detected" | sed -n 2p)"
+  [ -n "$nodever" ] && [ "$nodever" != 22 ] && nodeline="      node-version: \"${nodever}\""$'\n'
+  if [ -n "$uncovered" ]; then
+    todo="# TODO(onboard): the old workflows also ran these scripts, which are not covered below: ${uncovered}. Add them to verify, ui or backend."
+    echo "onboard: warning: existing workflows run scripts the new caller does not: ${uncovered}. Add them to ci.yml before removing the old workflow." >&2
+  fi
+
   local workflow="$root/.github/workflows/ci.yml" policy="$root/.github/ci.json"
   if [ -f "$workflow" ] && [ "$force" = 0 ]; then
     echo "onboard: $workflow exists, left alone (use --force to replace it)" >&2
@@ -73,6 +105,7 @@ name: CI
 
 # Thin caller: the logic lives in ${CI_REPO}. Edit the commands below or .github/ci.json, not the shared workflow.
 # The result to require on a branch is \`ci / check\`.
+${todo}
 on:
   push:
     branches: [${branch}]
@@ -94,7 +127,7 @@ jobs:
     uses: ${CI_REPO}/.github/workflows/node-app.yml@${CI_REF}
     with:
       default-branch: ${branch}
-      verify: |
+${nodeline}      verify: |
 ${verify}${ui}
 EOF
     # drop the blank line the heredoc leaves when there is no ui block

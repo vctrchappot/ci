@@ -50,3 +50,16 @@ test("a directory without package.json is refused and left untouched", options, 
   assert.notEqual(result.status, 0);
   assert.ok(!existsSync(join(dir, ".github")));
 });
+
+test("scripts an old workflow ran, and its Node version, are not silently dropped", options, () => {
+  const dir = project({
+    "package.json": '{"scripts":{"lint":"x","test":"y","e2e":"z"}}',
+    "package-lock.json": "",
+    ".github/workflows/ci.yml": "jobs:\n  t:\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 24\n      - run: npm run e2e\n",
+  });
+  const result = spawnSync("bash", [script, "--dir", dir, "--force"], { encoding: "utf8" });
+  assert.match(result.stderr, /do not: e2e/);
+  const workflow = readFileSync(join(dir, ".github/workflows/ci.yml"), "utf8");
+  assert.match(workflow, /TODO\(onboard\).*e2e/);
+  assert.match(workflow, /node-version: "24"/);
+});
