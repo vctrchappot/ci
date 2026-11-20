@@ -31,6 +31,9 @@ It detects pnpm, yarn or npm and the usual scripts (`format:check`, `lint`, `typ
 `.github/workflows/ci.yml`, a safe default `.github/ci.json` (everything runs until you narrow the groups) and a note for coding
 agents in `AGENTS.md` (and `CLAUDE.md` when it exists). It never deletes existing workflows; it lists the ones that now duplicate it.
 
+To bring the note of an already connected repository up to date, add `--refresh`: it rewrites only the managed `ci:begin` block
+(locally with `--dir .`, or as a draft pull request on branch `ci/refresh-note` with `owner/name`) and touches nothing else.
+
 ## Files
 
 | Path | Purpose |
@@ -42,8 +45,22 @@ agents in `AGENTS.md` (and `CLAUDE.md` when it exists). It never deletes existin
 | `actions/run` | runs a suite's commands one per line, times each, writes the job summary (`run.mjs`, no dependencies) |
 | `examples/randr.ci.json` | a real policy, also the fixture of the tests |
 | `scripts/onboard.sh` | connect a repository |
+| `scripts/local.mjs`, `scripts/local.sh` | run the suites a change needs on this machine, with the same scope logic and runner as CI |
 | `scripts/usage.mjs` | Actions minutes per private repository and which ones are not connected |
 | `docs/agent-snippet.md` | two lines for your user-level agent instructions |
+
+## Run it locally
+
+```bash
+# inside a connected repository; downloads the runner once a day (CI_REF picks the version, default v1)
+gh api repos/vctrchappot/ci/contents/scripts/local.sh --jq .content | base64 -d | bash -s -- --dry-run   # the plan
+gh api repos/vctrchappot/ci/contents/scripts/local.sh --jq .content | base64 -d | bash -s --              # run it
+```
+
+It compares your branch (commits, edits and new files) with the default branch, lets `scope.mjs` choose the suites from
+`.github/ci.json`, takes the commands from the caller workflow and runs them with the same timed runner as CI. It stops at the
+first failing suite. `--full` runs every suite that has a command, `--suite verify` only that one, `--base <ref>` changes the
+comparison. A local pass is a fast check before you push; `ci / check` still decides, and no commit status is written from here.
 
 ## Policy file
 
@@ -81,4 +98,4 @@ current docs), "raw" is the real run time.
   the ones that did not.
 - The skip helps only when the pull request was up to date with the default branch when it merged.
 - Anyone who can push to a repository could post a fake `ci/verified-tree` status, which is no wider than their right to push.
-- Self-test: `npm test` (scope logic). The workflows themselves are exercised by the repositories that call them.
+- Self-test: `npm test` (scope, runner, local runner, onboarding). The workflows themselves are exercised by the repositories that call them.

@@ -3,7 +3,7 @@ name: Node app checks
 # Reusable workflow: scope -> verify / ui / backend -> check. A job runs only when the repository's .github/ci.json says
 # the change set needs it AND the caller gave it a command. The job named `check` is the one result to require.
 #
-# Caller (see templates/ci.yml.tpl):
+# Caller (scripts/onboard.sh writes it):
 #   jobs:
 #     ci:
 #       uses: vctrchappot/ci/.github/workflows/node-app.yml@v1
