@@ -80,3 +80,11 @@ test("the policy is well formed", () => {
   assert.equal(policy.version, 1);
   assert.deepEqual(Object.keys(policy.suites), ["verify", "ui", "backend"]);
 });
+
+test("the default-branch log names the critical file, or the force, instead of a generic reason", async () => {
+  const { lookupReason } = await import("../actions/scope/scope.mjs");
+  const critical = { reason: "critical path changed" };
+  assert.equal(lookupReason(critical, { reason: "critical: functions/gateway/a.ts" }), "critical: functions/gateway/a.ts");
+  assert.equal(lookupReason(critical, { reason: "forced" }), "forced");
+  assert.equal(lookupReason({ reason: "tree was not verified on a pull request" }, { reason: "path groups" }), "tree was not verified on a pull request");
+});
