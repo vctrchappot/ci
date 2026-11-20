@@ -63,3 +63,35 @@ test("scripts an old workflow ran, and its Node version, are not silently droppe
   assert.match(workflow, /TODO\(onboard\).*e2e/);
   assert.match(workflow, /node-version: "24"/);
 });
+
+test("--refresh updates only the managed note and leaves everything else alone", options, () => {
+  const dir = project({ "package.json": '{"scripts":{"test":"y"}}', "pnpm-lock.yaml": "", "CLAUDE.md": "# Mine\n\nkeep me\n" });
+  onboard(dir);
+  const workflow = readFileSync(join(dir, ".github/workflows/ci.yml"), "utf8");
+  const claude = join(dir, "CLAUDE.md");
+  writeFileSync(claude, readFileSync(claude, "utf8").replace(/<!-- ci:begin[\s\S]*?<!-- ci:end -->/, "<!-- ci:begin old -->\nstale\n<!-- ci:end -->"));
+  writeFileSync(join(dir, "AGENTS.md"), "no note here\n");
+
+  const result = spawnSync("bash", [script, "--dir", dir, "--refresh"], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /updated the CI note in CLAUDE\.md/);
+  const text = readFileSync(claude, "utf8");
+  assert.match(text, /local\.sh/);
+  assert.doesNotMatch(text, /stale/);
+  assert.match(text, /keep me/);
+  assert.equal(text.match(/ci:begin/g).length, 1);
+  assert.equal(readFileSync(join(dir, "AGENTS.md"), "utf8"), "no note here\n", "a file without the managed block is not touched");
+  assert.equal(readFileSync(join(dir, ".github/workflows/ci.yml"), "utf8"), workflow, "the workflow is not touched");
+
+  const again = spawnSync("bash", [script, "--dir", dir, "--refresh"], { encoding: "utf8" });
+  assert.match(again.stdout, /already current/);
+});
+
+test("--refresh in a repository without a note says so and writes nothing", options, () => {
+  const dir = project({ "package.json": "{}" });
+  const result = spawnSync("bash", [script, "--dir", dir, "--refresh"], { encoding: "utf8" });
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /no CI note found/);
+  assert.equal(existsSync(join(dir, "AGENTS.md")), false);
+  assert.equal(existsSync(join(dir, ".github")), false);
+});

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 // Decides which CI suites a change set needs, and whether a push to the default branch can skip them because the
 // identical tree already passed on its pull request. Reads .github/ci.json. Fails safe: anything unknown runs everything.
-//   node scripts/ci/scope.mjs            (inside a GitHub Actions job, after a full checkout)
+//   node actions/scope/scope.mjs         (inside a GitHub Actions job, after a full checkout)
 
 /** Glob to RegExp: `**` crosses folders, `*` and `?` stay inside one, `{a,b}` alternates. */
 export function globToRegExp(glob) {
