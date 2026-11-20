@@ -118,9 +118,11 @@ permissions:
   pull-requests: read
   statuses: write
 
+# A newer push cancels the older run of the same pull request. Every push to the default branch has its own group and
+# runs to the end, so each commit gets a real \`ci / check\` result and the verified-tree skip can rely on it.
 concurrency:
-  group: ci-\${{ github.workflow }}-\${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-\${{ github.workflow }}-\${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: \${{ github.event_name == 'pull_request' }}
 
 jobs:
   ci:
