@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { auditCaller } from "./caller-audit.mjs";
 
 // Actions minutes per repository, from the jobs of the recent runs, and which private repositories are not yet
 // connected to the shared pipeline. Needs an authenticated gh. Public repositories are free and are left out.
@@ -69,16 +70,21 @@ async function repoUsage({ name }) {
     }
   });
   let shared = "-";
+  let findings = [];
   if (runs.length) {
     const files = (await gh("api", `repos/${slug}/contents/.github/workflows`, "--jq", ".[].path")).split("\n").filter(Boolean);
     let uses = false;
     for (const path of files) {
       const body = Buffer.from((await gh("api", `repos/${slug}/contents/${path}`, "--jq", ".content")).trim(), "base64").toString();
-      if (/vctrchappot\/ci\/\.github\/workflows\//.test(body)) uses = true;
+      const audit = auditCaller(body);
+      if (audit) {
+        uses = true;
+        findings = findings.concat(audit);
+      }
     }
     shared = uses ? "yes" : "NO";
   }
-  return { name, runs: runs.length, jobs, raw: Math.round(raw), billed, shared };
+  return { name, runs: runs.length, jobs, raw: Math.round(raw), billed, shared, findings };
 }
 
 const rows = (await pool(repos, 4, repoUsage)).filter((row) => row.runs > 0).sort((a, b) => b.billed - a.billed);
@@ -92,3 +98,9 @@ for (const row of rows) {
 console.log(`${"total".padEnd(24)} ${pad("", 5)} ${pad("", 5)} ${pad(total.raw, 6)} ${pad(total.billed, 7)}`);
 const missing = rows.filter((row) => row.shared === "NO").map((row) => row.name);
 if (missing.length) console.log(`\nNot on the shared pipeline: ${missing.join(", ")}\n  onboard: scripts/onboard.sh ${owner}/<name>`);
+const outdated = rows.filter((row) => row.findings.length);
+if (outdated.length) {
+  console.log("\nCallers that differ from what onboard.sh writes today:");
+  for (const row of outdated) console.log(`  ${row.name}: ${row.findings.join("; ")}`);
+  console.log("  fix: edit .github/workflows/ci.yml (scripts/onboard.sh --force rewrites it; check the commands first)");
+}

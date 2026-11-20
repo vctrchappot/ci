@@ -104,6 +104,11 @@ export function verifiedTreeVerdict({ repo, sha, before, tree, criticalChanged }
   return { skip: false, reason: "tree was not verified on a pull request" };
 }
 
+/** The reason to log for the default-branch lookup: a critical or forced run names the file or the force, not just "critical path changed". */
+export function lookupReason(lookup, verdict) {
+  return lookup.reason === "critical path changed" ? verdict.reason : lookup.reason;
+}
+
 function main() {
   const env = process.env;
   const outputs = {};
@@ -142,9 +147,9 @@ function main() {
       });
       const enforce = env.CI_SKIP_VERIFIED === "1";
       console.log(
-        `verified-tree: ${lookup.skip ? "WOULD SKIP" : "run"} (${lookup.reason}) ${enforce ? "[enforced]" : "[shadow: running everything anyway]"}`,
+        `verified-tree: ${lookup.skip ? "WOULD SKIP" : "run"} (${lookupReason(lookup, verdict)}) ${enforce ? "[enforced]" : "[shadow: running everything anyway]"}`,
       );
-      Object.assign(outputs, { verify: true, ui: true, backend: true, reason: lookup.reason });
+      Object.assign(outputs, { verify: true, ui: true, backend: true, reason: lookupReason(lookup, verdict) });
       if (lookup.skip && enforce) Object.assign(outputs, { verify: false, ui: false, backend: false, skip: true });
     }
     write();

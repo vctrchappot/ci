@@ -89,7 +89,7 @@ to the previous commit. Third-party actions are pinned to exact versions.
 node scripts/usage.mjs --days 7
 ```
 
-Needs an authenticated `gh`. "billed" rounds each job up to a whole minute (the usual billing behaviour; not stated in the
+Needs an authenticated `gh`. It also lists callers that differ from what `onboard.sh` writes today (pinned ref, concurrency, `ready_for_review`, `statuses: write`). "billed" rounds each job up to a whole minute (the usual billing behaviour; not stated in the
 current docs), "raw" is the real run time.
 
 ## Limits
