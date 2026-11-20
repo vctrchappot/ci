@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: self-test-${{ github.ref }}
-  cancel-in-progress: true
+  group: self-test-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:

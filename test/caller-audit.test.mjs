@@ -29,3 +29,13 @@ test("an old caller is flagged for everything it lacks", () => {
   assert.ok(findings.some((f) => /ready_for_review/.test(f)));
   assert.ok(findings.some((f) => /statuses/.test(f)));
 });
+
+test("cancelling every run, the default branch included, is flagged; cancelling only pull request runs is not", () => {
+  const head = "on:\n  pull_request:\n    types: [ready_for_review]\npermissions:\n  statuses: write\n";
+  const job = "jobs:\n  ci:\n    uses: vctrchappot/ci/.github/workflows/node-app.yml@v1\n";
+  const everything = auditCaller(`${head}concurrency:\n  group: ci-\${{ github.ref }}\n  cancel-in-progress: true\n${job}`);
+  assert.equal(everything.length, 1);
+  assert.match(everything[0], /default branch/);
+  const onlyPulls = auditCaller(`${head}concurrency:\n  group: ci-\${{ github.sha }}\n  cancel-in-progress: \${{ github.event_name == 'pull_request' }}\n${job}`);
+  assert.deepEqual(onlyPulls, []);
+});

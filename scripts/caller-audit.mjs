@@ -10,7 +10,10 @@ export function auditCaller(body) {
   if (!uses) return null;
   const findings = [];
   if (uses[1] !== "v1") findings.push(`pinned to @${uses[1]} (expected @v1)`);
-  if (!/^concurrency:/m.test(body) || !/cancel-in-progress:\s*true/.test(body)) findings.push("no cancel-in-progress concurrency");
+  if (!/^concurrency:/m.test(body)) findings.push("no concurrency group (superseded pull request runs are not cancelled)");
+  else if (/cancel-in-progress:\s*true\s*$/m.test(body)) {
+    findings.push("cancel-in-progress is true on the default branch too (cancelled commits are never verified; limit it to pull requests)");
+  }
   if (!/ready_for_review/.test(body)) findings.push("no ready_for_review trigger (drafts never run once marked ready)");
   if (!/statuses:\s*write/.test(body)) findings.push("no statuses: write (verified-tree is not recorded)");
   return findings;
